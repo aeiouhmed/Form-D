@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Form D Converter</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>K1 Import Converter</h1>
+        <p>Upload a Form D spreadsheet to convert it into the K1 import format.</p>
+      </header>
+
+      <section class="upload-section">
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <p class="dropzone-title">Drag &amp; drop your file here</p>
+          <p class="dropzone-subtitle">or</p>
+          <label class="file-label">
+            <input id="file-input" type="file" accept=".xls,.xlsx" hidden />
+            <span class="file-button">Choose file</span>
+          </label>
+          <p id="file-info" class="file-info">No file selected yet.</p>
+        </div>
+      </section>
+
+      <form id="convert-form" class="controls" novalidate>
+        <label class="control">
+          <span>Unit of Measure Mode</span>
+          <select id="uom-select" name="uom_mode">
+            <option value="random" selected>Random</option>
+            <option value="kgm">KGM only</option>
+          </select>
+        </label>
+
+        <button id="convert-button" type="submit" class="primary" disabled>
+          Convert and Download
+        </button>
+      </form>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <p id="last-file" class="last-file hidden">
+        Last download:
+        <a id="last-file-link" href="#" download></a>
+      </p>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
