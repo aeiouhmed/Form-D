@@ -1,5 +1,6 @@
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("file-input");
+const pickBtn = document.getElementById("pick-btn");
 const fileInfo = document.getElementById("file-info");
 const convertForm = document.getElementById("convert-form");
 const convertButton = document.getElementById("convert-button");
@@ -28,6 +29,7 @@ convertForm.insertAdjacentElement("afterend", spinner);
 
 const showSpinner = () => spinner.classList.remove("hidden");
 const hideSpinner = () => spinner.classList.add("hidden");
+let picking = false;
 
 const resetStatus = () => {
   statusEl.textContent = "";
@@ -148,11 +150,21 @@ dropzone.addEventListener("dragover", onDragOver);
 dropzone.addEventListener("dragleave", onDragLeave);
 dropzone.addEventListener("drop", onDrop);
 
+pickBtn.addEventListener("click", () => {
+  if (picking) return;
+  picking = true;
+  console.log("pickBtn clicked");
+  fileInput.click();
+  setTimeout(() => {
+    picking = false;
+  }, 500);
+});
+
 fileInput.addEventListener("change", (event) => {
   handleFiles(event.target.files);
 });
 
-dropzone.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("click", () => pickBtn.click());
 
 convertForm.addEventListener("submit", async (event) => {
   event.preventDefault();

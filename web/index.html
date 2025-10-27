@@ -17,10 +17,10 @@
         <div id="dropzone" class="dropzone" tabindex="0">
           <p class="dropzone-title">Drag &amp; drop your file here</p>
           <p class="dropzone-subtitle">or</p>
-          <label class="file-label">
+          <div class="file-picker">
             <input id="file-input" type="file" accept=".xls,.xlsx" hidden />
-            <span class="file-button">Choose file</span>
-          </label>
+            <button id="pick-btn" type="button" class="file-button">Choose file</button>
+          </div>
           <p id="file-info" class="file-info">No file selected yet.</p>
         </div>
       </section>

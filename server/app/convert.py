@@ -244,7 +244,11 @@ def _load_template(template_path: Path) -> List[str]:
 def _load_template_dataframe(template_path: Path) -> pd.DataFrame:
     ext = template_path.suffix.lower()
     if ext == ".xlsx":
-        return pd.read_excel(template_path, engine="openpyxl")
+        return pd.read_excel(
+            template_path,
+            engine="openpyxl",
+            mangle_dupe_cols=False,
+        )
     with open(template_path, "rb") as file:
         return _df_from_xls_bytes(file.read())
 
@@ -374,8 +378,10 @@ def _df_from_xls_bytes(xls_bytes: bytes) -> pd.DataFrame:
     book = xlrd.open_workbook(file_contents=xls_bytes)
     sheet = book.sheet_by_index(0)
     headers = [str(sheet.cell_value(0, c)).lstrip("'").strip() for c in range(sheet.ncols)]
-    rows = []
+    rows: list[list[object]] = []
     for r in range(1, sheet.nrows):
-        row = {headers[c]: sheet.cell_value(r, c) for c in range(sheet.ncols)}
-        rows.append(row)
-    return pd.DataFrame(rows)
+        row_values = [sheet.cell_value(r, c) for c in range(sheet.ncols)]
+        rows.append(row_values)
+    if rows:
+        return pd.DataFrame(rows, columns=headers)
+    return pd.DataFrame(columns=headers)
