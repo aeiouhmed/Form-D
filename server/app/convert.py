@@ -59,6 +59,35 @@ def _hs_out_code(value: object) -> str:
     return f"{digits}00"
 
 
+def _load_template_columns_xlsx(path: Path) -> list[str]:
+    wb = load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    headers: list[str] = []
+    row_iter = ws.iter_rows(min_row=1, max_row=1)
+    first_row = next(row_iter, ())
+    for cell in first_row:
+        value = cell.value
+        if isinstance(value, str):
+            value = value.strip().lstrip("'")
+        headers.append("" if value is None else str(value))
+    wb.close()
+    return headers
+
+
+def _load_template_columns_xls(path: Path) -> list[str]:
+    import xlrd
+
+    book = xlrd.open_workbook(path)
+    sheet = book.sheet_by_index(0)
+    headers: list[str] = []
+    for col_idx in range(sheet.ncols):
+        value = sheet.cell_value(0, col_idx)
+        if isinstance(value, str):
+            value = value.strip().lstrip("'")
+        headers.append("" if value is None else str(value))
+    return headers
+
+
 def _coerce_mapping_frame(df: pd.DataFrame) -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
@@ -320,20 +349,12 @@ def _load_source_dataframe(uploaded_bytes: bytes) -> pd.DataFrame:
 
 
 def _load_template(template_path: Path) -> List[str]:
-    template_df = _load_template_dataframe(template_path)
-    return template_df.columns.tolist()
-
-
-def _load_template_dataframe(template_path: Path) -> pd.DataFrame:
     ext = template_path.suffix.lower()
-    if ext == ".xlsx":
-        return pd.read_excel(
-            template_path,
-            engine="openpyxl",
-            mangle_dupe_cols=False,
-        )
-    with open(template_path, "rb") as file:
-        return _df_from_xls_bytes(file.read())
+    if ext in {".xlsx", ".xlsm", ".xltx", ".xltm"}:
+        return _load_template_columns_xlsx(template_path)
+    if ext == ".xls":
+        return _load_template_columns_xls(template_path)
+    raise ValueError(f"Unsupported template format: {template_path}")
 
 
 def _resolve_template_path(custom_path: str | Path | None) -> Path:
