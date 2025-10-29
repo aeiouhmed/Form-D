@@ -319,11 +319,11 @@ def convert_to_k1(
     output["ItemDescription3"] = ""
 
     output["ImportDutyMethod"] = "Exemption"
-    output["ImportDutyRateExemptedPercentage"] = 100000
+    output["ImportDutyRateExemptedPercentage"] = 100
     output["ImportDutyRateExemptedSpecific"] = ""
 
     output["SSTMethod"] = "Exemption"
-    output["SSTRateExemptedPercentage"] = 100000
+    output["SSTRateExemptedPercentage"] = 100
     output["SSTRateExemptedSpecific"] = ""
 
     output["ExciseDutyMethod"] = ""
