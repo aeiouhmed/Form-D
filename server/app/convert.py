@@ -18,12 +18,11 @@ from typing import Iterable, List
 
 import pandas as pd
 from openpyxl import load_workbook
+import xlrd
+from xlutils.copy import copy as xl_copy
+import xlwt
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "K1 Import Template.xls"
-if not TEMPLATE_PATH.exists():
-    alt_template = TEMPLATE_PATH.with_suffix(".xlsx")
-    if alt_template.exists():
-        TEMPLATE_PATH = alt_template
 
 ALWAYS_BLANK_COLUMN_NAMES = [
     "ExciseDutyMethod",
@@ -91,8 +90,11 @@ def _sanitize_cell(value: object) -> object:
     Excel has a character limit for cells, so this function ensures the content
     is valid and fits within the limit.
     """
-    if value is None:
+    if value is None or pd.isna(value):
         return ""
+    # xlwt does not handle numpy types, so convert them to standard Python types.
+    if hasattr(value, "item"):
+        value = value.item()
     if isinstance(value, (int, float)):
         return value
     text = str(value)
@@ -118,11 +120,15 @@ def _load_template_columns_xlsx(path: Path) -> list[str]:
 
 
 def _load_template_columns_xls(path: Path) -> list[str]:
-    """Load the header row from an XLS template file."""
+    """Load the header row from the 'JobCargo' sheet in an XLS template file."""
     import xlrd
 
     book = xlrd.open_workbook(path)
-    sheet = book.sheet_by_index(0)
+    try:
+        sheet = book.sheet_by_name("JobCargo")
+    except xlrd.biffh.XLRDError:
+        raise ValueError("Sheet 'JobCargo' not found in the template.")
+
     headers: list[str] = []
     for col_idx in range(sheet.ncols):
         value = sheet.cell_value(0, col_idx)
@@ -223,6 +229,39 @@ ALWAYS_BLANK_NORMALIZED = {
 ALWAYS_BLANK_COLLAPSED = {
     re.sub(r"[^a-z0-9]", "", value) for value in ALWAYS_BLANK_NORMALIZED
 }
+
+
+def _to_xls_bytes_with_template(final_df: pd.DataFrame, template_path: Path) -> bytes:
+    """Convert a DataFrame to XLS bytes using a template."""
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template file not found at {template_path}")
+
+    book_reader = xlrd.open_workbook(template_path, formatting_info=True)
+    book_writer = xl_copy(book_reader)
+
+    sheet_writer = None
+    try:
+        sheet_names = book_reader.sheet_names()
+        if "JobCargo" not in sheet_names:
+            raise ValueError("Sheet 'JobCargo' not found in the template.")
+        sheet_index = sheet_names.index("JobCargo")
+        sheet_writer = book_writer.get_sheet(sheet_index)
+    except IndexError:
+        raise ValueError("Sheet 'JobCargo' not found in the template.")
+
+    # Convert DataFrame to list of lists to ensure Python types
+    data_to_write = final_df.values.tolist()
+
+    # Write data starting from the second row (index 1)
+    for r_idx, row_data in enumerate(data_to_write, start=1):
+        for c_idx, value in enumerate(row_data):
+            sanitized_value = _sanitize_cell(value)
+            sheet_writer.write(r_idx, c_idx, sanitized_value)
+
+    buffer = BytesIO()
+    book_writer.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def convert_to_k1(
@@ -463,33 +502,9 @@ def convert_to_k1(
 
     _maybe_log_debug_samples(final_df)
 
-    # Sanitize all cells in the final DataFrame.
-    changed_cells = 0
-
-    def _sanitize_and_count(value: object) -> object:
-        nonlocal changed_cells
-        sanitized = _sanitize_cell(value)
-        if sanitized != value:
-            changed_cells += 1
-        return sanitized
-
-    try:
-        final_df = final_df.map(_sanitize_and_count)  # pandas >= 2.1
-    except AttributeError:
-        final_df = final_df.apply(lambda col: col.map(_sanitize_and_count))  # older pandas
-    if changed_cells and DEBUG_HSLOOKUP:
-        logging.debug("Sanitized %s cells containing control or overlength text.", changed_cells)
-
-    # Convert the final DataFrame to XLSX format as bytes.
-    return _to_clean_xlsx_bytes(final_df)
-
-
-def _to_clean_xlsx_bytes(final_df: pd.DataFrame) -> bytes:
-    """Convert a DataFrame to XLSX bytes."""
-    buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        final_df.to_excel(writer, sheet_name="Sheet1", index=False)
-    return buffer.getvalue()
+    # Convert the final DataFrame to XLS format as bytes, using the template.
+    template_file = _resolve_template_path(template_path)
+    return _to_xls_bytes_with_template(final_df, template_file)
 
 
 def _load_source_dataframe(uploaded_bytes: bytes) -> pd.DataFrame:

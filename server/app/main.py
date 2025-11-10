@@ -98,7 +98,7 @@ async def convert(
 
     # Generate a timestamped filename for the converted file.
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    filename = f'k1-import-{timestamp}.xlsx'
+    filename = f'k1-import-{timestamp}.xls'
 
     # Set headers to prompt the browser to download the file.
     headers = {
@@ -108,11 +108,11 @@ async def convert(
     # Return the converted file as a streaming response.
     return StreamingResponse(
         BytesIO(converted_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type="application/vnd.ms-excel",
         headers=headers,
     )
 
 
 # Mount the static files directory to serve the frontend application.
 # This allows the server to deliver the HTML, CSS, and JavaScript files.
-app.mount("/", StaticFiles(directory="../web", html=True), name="web")
+app.mount("/", StaticFiles(directory="web", html=True), name="web")
