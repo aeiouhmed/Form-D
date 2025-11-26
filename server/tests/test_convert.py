@@ -1,60 +1,43 @@
 import io
 import tempfile
 import unittest
-import zipfile
 from pathlib import Path
 from typing import List
 
 import pandas as pd
 from unittest.mock import patch
 
+# Import the module and function to test
 from server.app import convert as convert_module
 from server.app.convert import convert_to_k1
 
-NAMESPACE = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-
-
-def _column_ref_to_index(cell_ref: str) -> int:
-    column_part = "".join(filter(str.isalpha, cell_ref))
-    index = 0
-    for char in column_part:
-        index = index * 26 + (ord(char.upper()) - ord("A") + 1)
-    return index - 1
-
-
 def _extract_rows(xlsx_bytes: bytes, expected_columns: int) -> List[List[str]]:
-    import xml.etree.ElementTree as ET
-
-    rows: List[List[str]] = []
-    with zipfile.ZipFile(io.BytesIO(xlsx_bytes)) as archive:
-        shared_strings: List[str] = []
-        if "xl/sharedStrings.xml" in archive.namelist():
-            shared_root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
-            for si in shared_root.findall("s:si", NAMESPACE):
-                text_fragments = [node.text or "" for node in si.findall(".//s:t", NAMESPACE)]
-                shared_strings.append("".join(text_fragments))
-
-        sheet_root = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
-        for row in sheet_root.findall("s:sheetData/s:row", NAMESPACE):
-            values = [None] * expected_columns
-            for cell in row.findall("s:c", NAMESPACE):
-                ref = cell.get("r")
-                if not ref:
-                    continue
-                index = _column_ref_to_index(ref)
-                if not (0 <= index < expected_columns):
-                    continue
-                value = ""
-                cell_type = cell.get("t")
-                value_node = cell.find("s:v", NAMESPACE)
-                if value_node is not None:
-                    text = value_node.text or ""
-                    if cell_type == "s":
-                        value = shared_strings[int(text)] if text else ""
-                    else:
-                        value = text
-                values[index] = value
-            rows.append(values)
+    """
+    Helper to extract rows from the result bytes (which is an XLS file).
+    """
+    import xlrd
+    
+    # Open the bytes as an XLS workbook
+    book = xlrd.open_workbook(file_contents=xlsx_bytes)
+    sheet = book.sheet_by_index(0)
+    
+    rows = []
+    for r in range(sheet.nrows):
+        row_values = []
+        for c in range(sheet.ncols):
+            val = sheet.cell_value(r, c)
+            # Convert to string to match expected format in tests
+            if val is None:
+                row_values.append("")
+            else:
+                row_values.append(str(val))
+        rows.append(row_values)
+        
+    # Pad rows to expected columns if necessary
+    for row in rows:
+        while len(row) < expected_columns:
+            row.append("")
+            
     return rows
 
 
@@ -93,8 +76,15 @@ class ConvertToK1Tests(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            template_path = Path(tmpdir) / "template.xlsx"
-            pd.DataFrame(columns=template_columns).to_excel(template_path, index=False)
+            template_path = Path(tmpdir) / "template.xls"
+            
+            # --- FIX: Added sheet_name='JobCargo' ---
+            pd.DataFrame(columns=template_columns).to_excel(
+                template_path, 
+                index=False, 
+                engine='xlwt', 
+                sheet_name='JobCargo'  # <--- CRITICAL FIX
+            )
 
             source_df = pd.DataFrame(
                 {
@@ -187,8 +177,15 @@ class ConvertToK1Tests(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            template_path = Path(tmpdir) / "template.xlsx"
-            pd.DataFrame(columns=template_columns).to_excel(template_path, index=False)
+            template_path = Path(tmpdir) / "template.xls"
+            
+            # --- FIX: Added sheet_name='JobCargo' ---
+            pd.DataFrame(columns=template_columns).to_excel(
+                template_path, 
+                index=False, 
+                engine='xlwt', 
+                sheet_name='JobCargo'  # <--- CRITICAL FIX
+            )
 
             source_df = pd.DataFrame(
                 {
